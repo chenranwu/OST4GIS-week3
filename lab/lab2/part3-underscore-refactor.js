@@ -32,10 +32,31 @@
 
 
   // clean data
-  for (var i = 0; i < schools.length - 1; i++) {
+  schools = _.each(schools, function(school){
+    if (_.isString(school.ZIPCODE)) {
+      split = school.ZIPCODE.split(" ");
+      normalized_zip = parseInt(split[0]);
+      school.ZIPCODE = normalized_zip;
+    }
+
+    // Check out the use of typeof here — this was not a contrived example.
+    // Someone actually messed up the data entry
+    if (_.isNumber(school.GRADE_ORG)) {  // if number
+      school.HAS_KINDERGARTEN = school.GRADE_LEVEL < 1;
+      school.HAS_ELEMENTARY = 1 < school.GRADE_LEVEL < 6;
+      school.HAS_MIDDLE_SCHOOL = 5 < school.GRADE_LEVEL < 9;
+      school.HAS_HIGH_SCHOOL = 8 < school.GRADE_LEVEL < 13;
+    } else {  // otherwise (in case of string)
+      school.HAS_KINDERGARTEN = school.GRADE_LEVEL.toUpperCase().indexOf('K') >= 0;
+      school.HAS_ELEMENTARY = school.GRADE_LEVEL.toUpperCase().indexOf('ELEM') >= 0;
+      school.HAS_MIDDLE_SCHOOL = school.GRADE_LEVEL.toUpperCase().indexOf('MID') >= 0;
+      school.HAS_HIGH_SCHOOL = school.GRADE_LEVEL.toUpperCase().indexOf('HIGH') >= 0;
+    }
+  })
+  /*for (var i = 0; i < schools.length - 1; i++) {
     // If we have '19104 - 1234', splitting and taking the first (0th) element
     // as an integer should yield a zip in the format above
-    if (typeof schools[i].ZIPCODE === 'string') {
+    if (_.isString(schools[i].ZIPCODE)) {
       split = schools[i].ZIPCODE.split(' ');
       normalized_zip = parseInt(split[0]);
       schools[i].ZIPCODE = normalized_zip;
@@ -43,7 +64,7 @@
 
     // Check out the use of typeof here — this was not a contrived example.
     // Someone actually messed up the data entry
-    if (typeof schools[i].GRADE_ORG === 'number') {  // if number
+    if (_.isNumber(schools[i].GRADE_ORG)) {  // if number
       schools[i].HAS_KINDERGARTEN = schools[i].GRADE_LEVEL < 1;
       schools[i].HAS_ELEMENTARY = 1 < schools[i].GRADE_LEVEL < 6;
       schools[i].HAS_MIDDLE_SCHOOL = 5 < schools[i].GRADE_LEVEL < 9;
@@ -55,10 +76,30 @@
       schools[i].HAS_HIGH_SCHOOL = schools[i].GRADE_LEVEL.toUpperCase().indexOf('HIGH') >= 0;
     }
   }
-
+ */
   // filter data
-  var filtered_data = [];
-  var filtered_out = [];
+  var filtered_data;
+  var filtered_out;
+  schools = _.each(schools, function(school){
+    isOpen = school.ACTIVE.toUpperCase() == 'OPEN';
+    isPublic = (school.TYPE.toUpperCase() !== 'CHARTER' ||
+                school.TYPE.toUpperCase() !== 'PRIVATE');
+    isSchool = (school.HAS_KINDERGARTEN ||
+                school.HAS_ELEMENTARY ||
+                school.HAS_MIDDLE_SCHOOL ||
+                school.HAS_HIGH_SCHOOL);
+    meetsMinimumEnrollment = school.ENROLLMENT > minEnrollment;
+    meetsZipCondition = acceptedZipcodes.indexOf(school.ZIPCODE) >= 0;
+    school.filter_condition = (isOpen &&
+                        isSchool &&
+                        meetsMinimumEnrollment &&
+                        !meetsZipCondition);
+  })
+  filtered_data = _.filter(schools, function(school){return school.filter_condition});
+  filtered_out = _.reject(schools, function(school){return school.filter_condition});
+  console.log('Included:', filtered_data.length);
+  console.log('Excluded:', filtered_out.length);
+  /*
   for (var i = 0; i < schools.length - 1; i++) {
     isOpen = schools[i].ACTIVE.toUpperCase() == 'OPEN';
     isPublic = (schools[i].TYPE.toUpperCase() !== 'CHARTER' ||
@@ -82,9 +123,24 @@
   }
   console.log('Included:', filtered_data.length);
   console.log('Excluded:', filtered_out.length);
-
+*/
   // main loop
   var color;
+  _.each(filtered_data, function(school){
+    if (school.HAS_HIGH_SCHOOL){
+      color = '#0000FF';
+    } else if (school.HAS_MIDDLE_SCHOOL) {
+      color = '#00FF00';
+    } else {
+      color = '##FF0000';
+    }
+    var pathOpts = {'radius': school.ENROLLMENT / 30,
+                    'fillColor': color};
+    L.circleMarker([school.Y, school.X], pathOpts)
+      .bindPopup(school.FACILNAME_LABEL)
+      .addTo(map);
+  })
+  /*
   for (var i = 0; i < filtered_data.length - 1; i++) {
     isOpen = filtered_data[i].ACTIVE.toUpperCase() == 'OPEN';
     isPublic = (filtered_data[i].TYPE.toUpperCase() !== 'CHARTER' ||
@@ -106,5 +162,5 @@
       .bindPopup(filtered_data[i].FACILNAME_LABEL)
       .addTo(map);
   }
-
+*/
 })();
